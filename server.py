@@ -6,6 +6,7 @@ import json
 from data import me, catalog
 import random
 from flask_cors import CORS
+from config import db
 
 app = Flask(__name__)
 CORS(app)
@@ -29,7 +30,9 @@ def about():
 #####################################################
 ######################API PRODUCTS ##################
 #####################################################
-
+def fix_id(obj):
+    obj["_id"] = str(obj["_id"])
+    return obj
 
 @app.get("/api/test")
 def test_api():
@@ -46,7 +49,13 @@ def about_api():
 
 @app.get("/api/catalog")
 def get_catalog():
-    return json.dumps(catalog)
+    cursor = db.Products.find({})
+    results = []
+    for prod in cursor:
+        prod = fix_id(prod)
+        results.append(prod)
+
+    return json.dumps(results)
     # return the list of product
 
 @app.post("/api/catalog")
@@ -63,11 +72,14 @@ def save_product():
         return abort(400, "ERROR: Price must be greater than 1") 
     elif len(product["title"]) < 5:
         return abort(400, "ERROR: Title should have at least 5 characters")
-    else:
-        # assigns a unique_id
-        product["_id"] = random.randint(100,100000)
-        catalog.append(product)
-        return product
+    
+    
+    db.Products.insert_one(product)
+
+    product["_id"] = str(product["_id"])
+    print(product)
+
+    return json.dumps(product)
 
 
 
