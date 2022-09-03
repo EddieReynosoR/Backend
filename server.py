@@ -7,6 +7,7 @@ from data import me, catalog
 import random
 from flask_cors import CORS
 from config import db
+from bson import ObjectId
 
 app = Flask(__name__)
 CORS(app)
@@ -86,19 +87,25 @@ def save_product():
 
 @app.get("/api/product/<id>")
 def get_product_by_id(id):
-    for prod in catalog:
-        if(prod["_id"] == id):
-            return json.dumps(prod)
-    return json.dumps("Error: ID not valid")
+
+    prod = db.Products.find_one({"_id": ObjectId(id)}) # One Object
+    prod = fix_id(prod)
+    
+    if not prod:
+        return abort(400, "ERROR: ID not valid")
+    else:
+        return json.dumps(prod)
 
 
 
-@app.get("/api/product/category/<category>")
+@app.get("/api/product/<category>")
 def get_product_by_category(category):
+
+    cursor = db.Products.find({ "category": category })
     results = []
-    for prod in catalog:
-        if(prod["category"].lower() == category.lower()):
-            results.append(prod)
+    for prod in cursor:
+        prod = fix_id(prod)
+        results.append(prod)
 
     if not results:
         return json.dumps("Error: there's no product with that category.")
@@ -106,19 +113,26 @@ def get_product_by_category(category):
         return json.dumps(results)
 
 
-
-
-
 @app.get("/api/count")
 def count_catalog():
-    count = len(catalog)
+    cursor = db.Products.find({})
+    prods = []
+
+    for prod in cursor:
+        prods.append(prod)
+
+
+    
+    count = len(prods)
+    
     return json.dumps("Number of products: " + str(count))
 
 
-@app.get("/api/total")
+@app.get("/api/catalog/total")
 def catalog_total():
+    cursor = db.Products.find({})
     total = 0
-    for prod in catalog:
+    for prod in cursor:
         total += prod["price"]
     return json.dumps("Total: " + str(total))
 
@@ -184,6 +198,32 @@ def PaperRockSci(pick):
 
         return json.dumps(results)
     
+
+@app.get("/api/coupons")
+def getCoupon():
+    cursor = db.CouponCodes.find({})
+    results = []
+
+    for cp in cursor:
+        cp = fix_id(cp)
+        results.append(cp)
+
+    return json.dumps(results)
+
+
+@app.post("/api/coupons")
+def saveCoupon():
+    coupon = request.get_json()
+
+    # validations
+    if not 'code' in coupon:
+        abort(400, "code is required")
+    if not 'discount' in coupon:
+        abort(400, "discount is required")
+    
+    db.CouponCodes.insert_one(coupon)
+    coupon = fix_id(coupon)
+    return json.dumps(coupon)
 
 app.debug = True
 app.run()
